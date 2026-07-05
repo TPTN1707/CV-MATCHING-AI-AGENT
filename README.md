@@ -41,30 +41,33 @@ CV-MATCHING-AI-AGENT is an end-to-end AI application that automatically analyzes
 # 🏗️ Architecture
 
 ```text
-Google Careers
-      │
-      ▼
- job_craws.py
-      │
-BeautifulSoup + HTTPX
-      │
-      ▼
-Google Embeddings
-      │
-      ▼
- ChromaDB
-      │
-      ▼
-search_jobs Tool
-      │
-      ▼
-LangChain Agent
-      │
-      ▼
- FastAPI API
-      │
-      ▼
- Streamlit UI
+               Resume (PDF)
+
+                     │
+                     ▼
+          Streamlit Frontend
+                     │
+          HTTP + Streaming (SSE)
+                     │
+                     ▼
+             FastAPI Backend
+                     │
+                     ▼
+          LangChain AI Agent
+                     │
+         ┌───────────┴────────────┐
+         │                        │
+         ▼                        ▼
+ search_jobs()              Gemini 2.5 Flash
+         │                        │
+         ▼                        │
+   Chroma VectorDB                │
+         ▲                        │
+         │                        │
+ Google Embedding-2               │
+         ▲                        │
+         │                        │
+ Google Careers Crawler ──────────┘
 ```
 
 ---
@@ -290,19 +293,6 @@ Output:
 
 ---
 
-# 📸 Screenshots
-
-Add screenshots here after completing the UI.
-
-```text
-docs/
-    homepage.png
-    uploading.png
-    matching.png
-```
-
----
-
 # 📜 License
 
 MIT License
@@ -323,3 +313,15 @@ Developed as an AI Engineering portfolio project demonstrating:
 - Production-oriented Python engineering
 
 If you find this project useful, consider giving it a ⭐ on GitHub.
+
+---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+You are free to use, modify, and distribute this project in accordance with the terms of the MIT License.
+
+This project was developed primarily for **educational purposes**, **learning**, and **portfolio demonstration**.
+
+See the [LICENSE](LICENSE) file for more details.
