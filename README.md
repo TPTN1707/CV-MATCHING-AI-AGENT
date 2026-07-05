@@ -484,12 +484,12 @@ Server-Sent Events (SSE)
 
 # Author
 
-**Tang Phuc Quan**
+**Tran Pham Trong Nhan**
 
 AI / Machine Learning Enthusiast
 
 GitHub:
-https://github.com/your_username
+https://github.com/TPTN1707
 
 ---
 
