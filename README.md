@@ -295,7 +295,13 @@ Output:
 
 # 📜 License
 
-MIT License
+This project is licensed under the **MIT License**.
+
+You are free to use, modify, and distribute this project in accordance with the terms of the MIT License.
+
+This project was developed primarily for **educational purposes**, **learning**, and **portfolio demonstration**.
+
+See the [LICENSE](LICENSE) file for more details.
 
 ---
 
@@ -314,14 +320,3 @@ Developed as an AI Engineering portfolio project demonstrating:
 
 If you find this project useful, consider giving it a ⭐ on GitHub.
 
----
-
-# 📄 License
-
-This project is licensed under the **MIT License**.
-
-You are free to use, modify, and distribute this project in accordance with the terms of the MIT License.
-
-This project was developed primarily for **educational purposes**, **learning**, and **portfolio demonstration**.
-
-See the [LICENSE](LICENSE) file for more details.
