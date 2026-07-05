@@ -1,4 +1,4 @@
-"""Định nghĩa các Pydantic model cho response của hệ thống matching."""
+"""Defines the Pydantic models for the matching system response."""
 
 from typing import List, Union
 
@@ -6,49 +6,49 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class MatchResult(BaseModel):
-    """Kết quả phân tích mức độ phù hợp giữa resume và một job posting."""
+    """Analysis result of the compatibility between a resume and a job posting."""
 
     job_id: str = Field(
         ...,
-        description="ID định danh của job posting",
+        description="Unique identifier of the job posting",
     )
     job_title: str = Field(
         ...,
-        description="Tên vị trí tuyển dụng",
+        description="Job title",
     )
     job_url: str = Field(
         default="",
-        description="URL để ứng tuyển",
+        description="Application URL",
     )
     match_score: int = Field(
         ...,
         ge=0,
         le=100,
-        description="Điểm phù hợp từ 0-100",
+        description="Compatibility score from 0 to 100",
     )
     strengths: List[str] = Field(
         default_factory=list,
-        description="Các điểm mạnh của ứng viên khớp với yêu cầu",
+        description="Candidate strengths that match the job requirements",
     )
     reasoning: str = Field(
         default="",
-        description="Lý do tại sao phù hợp hoặc không phù hợp",
+        description="Reason why the candidate is or is not a good match",
     )
     missing_skills: List[str] = Field(
         default_factory=list,
-        description="Các kỹ năng quan trọng ứng viên còn thiếu",
+        description="Important skills the candidate is missing",
     )
     improvement_tips: str = Field(
         default="",
-        description="Gợi ý cải thiện để tăng cơ hội trúng tuyển (một chuỗi duy nhất)",
+        description="Suggestions to improve the chances of getting hired (a single string)",
     )
 
     @model_validator(mode="before")
     @classmethod
     def normalize_field_names(cls, data):
         """
-        LLM đôi khi trả field name khác với schema.
-        Map các alias phổ biến về đúng tên field.
+        The LLM may sometimes return field names that differ from the schema.
+        Map common aliases to the correct field names.
         """
         if not isinstance(data, dict):
             return data
@@ -72,7 +72,7 @@ class MatchResult(BaseModel):
     @field_validator("improvement_tips", mode="before")
     @classmethod
     def coerce_tips_to_str(cls, v):
-        """Nếu LLM trả list thay vì string, nối lại thành chuỗi."""
+        """If the LLM returns a list instead of a string, join it into a single string."""
         if isinstance(v, list):
             return "; ".join(str(item) for item in v)
         if v is None:
@@ -82,7 +82,7 @@ class MatchResult(BaseModel):
     @field_validator("reasoning", mode="before")
     @classmethod
     def coerce_reasoning(cls, v):
-        """Nếu LLM trả list hoặc None, xử lý cho đúng."""
+        """Handle cases where the LLM returns a list or None."""
         if v is None:
             return ""
         if isinstance(v, list):
@@ -91,9 +91,9 @@ class MatchResult(BaseModel):
 
 
 class MatchResponse(BaseModel):
-    """Response chứa danh sách kết quả matching."""
+    """Response containing the list of matching results."""
 
     matches: List[MatchResult] = Field(
         default_factory=list,
-        description="Danh sách các job match đã được phân tích",
+        description="List of analyzed job matching results",
     )
