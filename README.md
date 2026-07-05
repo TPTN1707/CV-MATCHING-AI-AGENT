@@ -109,7 +109,7 @@ CV-MATCHING-AI-AGENT/
 # ⚙️ Installation
 
 ```bash
-git clone https://github.com/<your-username>/CV-MATCHING-AI-AGENT.git
+git clone https://github.com/<TPTN1707>/CV-MATCHING-AI-AGENT.git
 
 cd CV-MATCHING-AI-AGENT
 
