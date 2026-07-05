@@ -16,7 +16,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-# URL tìm kiếm cơ sở (không bao gồm tham số trang)
+# Base search URL (without the page query parameter)
 BASE_SEARCH_URL = "https://www.google.com/about/careers/applications/jobs/results?location=Vietnam"
 _CAREERS_ORIGIN = "https://www.google.com/about/careers/applications/"
 
@@ -29,15 +29,15 @@ _REQUEST_HEADERS = {
     ),
 }
 
+
 def _build_page_url(base_url: str, page_number: int) -> str:
-    """Xây dựng URL cho từng trang kết quả tìm kiếm."""
+    """Build the URL for a specific search results page."""
     separator = "&" if "?" in base_url else "?"
     return f"{base_url}{separator}page={page_number}"
 
 
-
 def _extract_links_from_html(html_content: str) -> set[str]:
-    """Phân tích HTML và trích xuất các liên kết tuyển dụng hợp lệ."""
+    """Parse HTML and extract valid job posting links."""
     parsed = BeautifulSoup(html_content, "html.parser")
     collected = set()
     anchor_elements = parsed.select("a[href*='jobs/results/']")
@@ -51,18 +51,20 @@ def _extract_links_from_html(html_content: str) -> set[str]:
 
 def _extract_job_content(parsed: BeautifulSoup) -> str:
     """
-    Trích xuất chỉ phần nội dung job posting từ HTML đã parse.
-    Lấy các section: Job title, Minimum/Preferred qualifications, About the job, Responsibilities.
-    Bỏ qua navigation, footer, EEO policy, social links...
+    Extract only the job posting content from the parsed HTML.
+    Include the following sections:
+    Job title, Minimum/Preferred qualifications,
+    About the job, Responsibilities.
+    Exclude navigation, footer, EEO policy, social links, etc.
     """
     content_parts: list[str] = []
 
-    # Lấy tiêu đề job (thường nằm trong h2 đầu tiên sau "Job Details")
+    # Extract the job title (usually the first h2 after "Job Details")
     job_title_tag = parsed.find("h2")
     if job_title_tag:
         content_parts.append(job_title_tag.get_text(strip=True))
 
-    # Các section chứa nội dung job thực sự
+    # Sections containing the actual job description
     target_sections = [
         "Minimum qualifications",
         "Preferred qualifications",
@@ -73,7 +75,7 @@ def _extract_job_content(parsed: BeautifulSoup) -> str:
     for heading in parsed.find_all("h3"):
         heading_text = heading.get_text(strip=True).rstrip(":")
         if heading_text in target_sections:
-            # Lấy tất cả nội dung giữa heading này và heading tiếp theo
+            # Extract all content between this heading and the next heading
             section_content = []
             sibling = heading.find_next_sibling()
             while sibling and sibling.name not in ("h2", "h3"):
@@ -87,57 +89,64 @@ def _extract_job_content(parsed: BeautifulSoup) -> str:
     return "\n\n".join(content_parts)
 
 
-
 def get_job_urls(base_url: str, pages: int = 5) -> list[str]:
     """
-    Thu thập liên kết việc làm từ nhiều trang kết quả tìm kiếm.
+    Collect job posting links from multiple search result pages.
     """
     all_links: set[str] = set()
 
     with httpx.Client(headers=_REQUEST_HEADERS, follow_redirects=True, timeout=15.0) as client:
         for page_idx in range(1, pages + 1):
             target_url = _build_page_url(base_url, page_idx)
-            logger.info("Đang tải trang %d: %s", page_idx, target_url)
+            logger.info("Loading page %d: %s", page_idx, target_url)
 
             try:
                 resp = client.get(target_url)
                 resp.raise_for_status()
             except httpx.HTTPStatusError as err:
-                logger.warning("Lỗi HTTP %d ở trang %d – bỏ qua", err.response.status_code, page_idx)
+                logger.warning("HTTP error %d on page %d – skipping", err.response.status_code, page_idx)
                 continue
             except httpx.RequestError as err:
-                logger.error("Lỗi mạng ở trang %d: %s", page_idx, err)
+                logger.error("Network error on page %d: %s", page_idx, err)
                 continue
 
             page_links = _extract_links_from_html(resp.text)
             all_links.update(page_links)
-            logger.info("Trang %d thu được %d liên kết (tổng: %d)", page_idx, len(page_links), len(all_links))
+            logger.info(
+                "Page %d collected %d links (total: %d)",
+                page_idx,
+                len(page_links),
+                len(all_links),
+            )
 
-    logger.info("Hoàn tất crawl – thu được %d URL việc làm từ %d trang", len(all_links), pages)
+    logger.info(
+        "Crawling completed – collected %d job URLs from %d pages",
+        len(all_links),
+        pages,
+    )
     return sorted(all_links)
 
 
-
 async def _fetch_page_content(client: httpx.AsyncClient, url: str) -> Optional[Document]:
-    """Tải nội dung một trang job posting và trích xuất phần mô tả công việc."""
+    """Fetch a job posting page and extract the job description."""
     try:
         resp = await client.get(url)
         resp.raise_for_status()
     except (httpx.HTTPStatusError, httpx.RequestError) as err:
-        logger.warning("Không thể tải %s: %s", url, err)
+        logger.warning("Failed to fetch %s: %s", url, err)
         return None
 
     parsed = BeautifulSoup(resp.text, "html.parser")
 
-    # Loại bỏ script/style trước khi xử lý
+    # Remove script/style tags before processing
     for tag in parsed(["script", "style"]):
         tag.decompose()
 
-    # Trích xuất chỉ nội dung job, không lấy toàn bộ trang
+    # Extract only the job description instead of the entire page
     job_content = _extract_job_content(parsed)
 
     if not job_content.strip():
-        # Fallback: nếu không parse được theo cấu trúc, lấy text thô nhưng loại bỏ nav/footer
+        # Fallback: if structured parsing fails, extract plain text while removing nav/footer/header
         for tag in parsed(["nav", "footer", "header"]):
             tag.decompose()
         job_content = parsed.get_text(separator="\n", strip=True)
@@ -145,7 +154,7 @@ async def _fetch_page_content(client: httpx.AsyncClient, url: str) -> Optional[D
     if not job_content.strip():
         return None
 
-    # Lấy title từ thẻ <title> hoặc từ h2 đầu tiên
+    # Get the title from the <title> tag or the first h2
     title_tag = parsed.find("title")
     title_text = title_tag.get_text(strip=True) if title_tag else ""
 
@@ -155,9 +164,8 @@ async def _fetch_page_content(client: httpx.AsyncClient, url: str) -> Optional[D
     )
 
 
-
 async def _scrape_all_urls(urls: list[str], concurrency: int = 8) -> list[Document]:
-    """Tải song song nhiều URL với giới hạn số lượng kết nối đồng thời."""
+    """Fetch multiple URLs concurrently with a limit on simultaneous connections."""
     semaphore = asyncio.Semaphore(concurrency)
     documents: list[Document] = []
 
@@ -173,41 +181,42 @@ async def _scrape_all_urls(urls: list[str], concurrency: int = 8) -> list[Docume
         if isinstance(result, Document):
             documents.append(result)
         elif isinstance(result, Exception):
-            logger.warning("Lỗi không mong đợi khi scrape: %s", result)
+            logger.warning("Unexpected error while scraping: %s", result)
 
     return documents
 
-async def ingest_jobs():
-    """Thu thập mô tả công việc từ web và lưu vào ChromaDB."""
-    logger.info("Bắt đầu quy trình thu thập dữ liệu việc làm...")
 
-    # Bước 1: Thu thập danh sách URL việc làm
+async def ingest_jobs():
+    """Collect job descriptions from the web and store them in ChromaDB."""
+    logger.info("Starting the job data collection process...")
+
+    # Step 1: Collect job posting URLs
     job_urls = get_job_urls(BASE_SEARCH_URL, pages=5)
 
     if not job_urls:
-        logger.warning("Không tìm thấy URL việc làm nào – dừng thu thập.")
+        logger.warning("No job URLs found – stopping ingestion.")
         return
 
-    logger.info("Đang tải nội dung từ %d URL đã thu thập...", len(job_urls))
+    logger.info("Fetching content from %d collected URLs...", len(job_urls))
     print(job_urls)
 
-    # Bước 2: Tải nội dung các trang song song
+    # Step 2: Fetch page contents concurrently
     documents = await _scrape_all_urls(job_urls)
 
     if not documents:
-        logger.warning("Không tải được tài liệu nào từ các URL.")
+        logger.warning("No documents could be retrieved from the URLs.")
         return
 
-    logger.info("Đã tải thành công %d tài liệu", len(documents))
+    logger.info("Successfully fetched %d documents", len(documents))
 
-    # Bước 3: Xóa collection cũ (nếu tồn tại) để tránh dữ liệu trùng lặp
+    # Step 3: Delete the existing collection (if any) to avoid duplicate data
     chroma_client = chromadb.PersistentClient(path="./chroma_db")
     existing_collections = [c.name for c in chroma_client.list_collections()]
     if "job_postings" in existing_collections:
         chroma_client.delete_collection("job_postings")
-        logger.info("Đã xóa collection cũ 'job_postings'")
+        logger.info("Deleted existing collection 'job_postings'")
 
-    # Bước 4: Tạo embeddings và lưu vào vector store mới
+    # Step 4: Generate embeddings and store them in a new vector store
     embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
     vector_store = Chroma(
         collection_name="job_postings",
@@ -222,14 +231,22 @@ async def ingest_jobs():
         start = chunk_idx * chunk_size
         end = start + chunk_size
         chunk = documents[start:end]
-        logger.info("Đang lập chỉ mục lô %d/%d (%d tài liệu)...", chunk_idx + 1, total_chunks, len(chunk))
+        logger.info(
+            "Indexing batch %d/%d (%d documents)...",
+            chunk_idx + 1,
+            total_chunks,
+            len(chunk),
+        )
         try:
             await vector_store.aadd_documents(chunk)
         except Exception as exc:
-            logger.error("Lỗi khi lập chỉ mục lô %d: %s", chunk_idx + 1, exc)
+            logger.error("Failed to index batch %d: %s", chunk_idx + 1, exc)
 
     total_indexed = vector_store._collection.count()
-    logger.info("Hoàn tất thu thập – %d tài liệu đã được lưu trong vector store.", total_indexed)
+    logger.info(
+        "Ingestion completed – %d documents have been stored in the vector store.",
+        total_indexed,
+    )
 
 
 if __name__ == "__main__":
